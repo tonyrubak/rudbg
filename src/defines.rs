@@ -9,6 +9,8 @@ type WORD = u16;
 const DEBUG_PROCESS = 0x1;
 const CREATE_NEW_CONSOLE = 0x10;
 
+
+/* StartupInfo structure for CreateProcessA() */
 struct StartupInfo {
     cb: DWORD,
     lpReserved: LPSTR,
@@ -29,4 +31,12 @@ struct StartupInfo {
     hStdOutput: HANDLE,
     hStdError: HANDLE
     
+}
+
+/* ProcessInformation structure for CreateProcessA() */
+struct ProcessInformation {
+    hProcess: HANDLE,
+    hThread: HANDLE,
+    dwProcessId: DWORD,
+    dwThreadId: DWORD
 }
