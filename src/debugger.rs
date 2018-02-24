@@ -1,6 +1,5 @@
 use win32;
 
-use std::io;
 use std::mem;
 use std::ptr;
 
@@ -135,5 +134,98 @@ pub fn detach(debugger: Debugger) -> bool {
         println!("Something went wrong!");
         println!("Error code: {}", err);
         false
+    }
+}
+
+pub fn enumerate_threads(debugger: &Debugger) -> Result<Vec<win32::DWORD>, win32::DWORD> {
+    let mut thread_entry = win32::THREADENTRY32 {
+        dwSize: 0,
+        cntUsage: 0,
+        th32ThreadId: 0,
+        th32OwnerProcessId: 0,
+        tpBasePri: 0,
+        tpDeltaPri: 0,
+        dwFlags: 0,
+    };
+
+    let mut thread_list: Vec<win32::DWORD> = Vec::new();
+
+    let snapshot = unsafe { win32::CreateToolhelp32Snapshot(win32::TH32CS_SNAPTHREAD, debugger.pid) };
+
+    if ptr::eq(snapshot, ptr::null()) {
+        let err = unsafe { win32::GetLastError() };
+        Err(err)
+    }
+    else {
+        thread_entry.dwSize = mem::size_of::<win32::THREADENTRY32>() as u32;
+        let mut success = unsafe { win32::Thread32First(snapshot, &mut thread_entry as *mut _) };
+        while success != 0 {
+            if thread_entry.th32OwnerProcessId == debugger.pid {
+                thread_list.push(thread_entry.th32ThreadId);
+                success = unsafe { win32::Thread32Next(snapshot, &mut thread_entry as *mut _) };
+            }
+        }
+        unsafe { win32::CloseHandle(snapshot) };
+        Ok(thread_list)
+    }
+}
+
+pub fn get_thread_context(debugger: &Debugger, thread_id: win32::DWORD) -> Result<win32::Context, win32::DWORD> {
+    let mut context = win32::Context {
+        ContextFlags: win32::CONTEXT_DEBUG_REGISTERS | win32::CONTEXT_FULL,
+        Dr0: 0,
+        Dr1: 0,
+        Dr2: 0,
+        Dr3: 0,
+        Dr6: 0,
+        Dr7: 0,
+        FloatSave: win32::FLOATING_SAVE_AREA {
+            ControlWord: 0,
+            StatusWord: 0,
+            TagWord: 0,
+            ErrorOffset: 0,
+            ErrorSelector: 0,
+            DataOffset: 0,
+            DataSelector: 0,
+            RegisterArea: [0u8; 80],
+            Cr0NpxState: 0,
+        },
+        SegGs: 0,
+        SegFs: 0,
+        SegEs: 0,
+        SegDs: 0,
+        Edi: 0,
+        Esi: 0,
+        Ebx: 0,
+        Edx: 0,
+        Ecx: 0,
+        Eax: 0,
+        Ebp: 0,
+        Eip: 0,
+        SegCs: 0,
+        Esp: 0,
+        SegSs: 0,
+        ExtendedRegisters: [0u8; win32::MAXIMUM_SUPPORTED_EXTENSION],
+    };
+    let thread = match open_thread(thread_id) {
+        Ok(t) => t,
+        Err(e) => { return Err(e); }
+    };
+    if unsafe { win32::GetThreadContext(thread, &mut context as *mut _) } != 0 {
+        unsafe { win32::CloseHandle(thread) };
+        Ok(context)
+    } else {
+        let err = unsafe { win32::GetLastError() };
+        Err(err)
+    }
+}
+
+fn open_thread(thread_id: win32::DWORD) -> Result<win32::HANDLE, win32::DWORD> {
+    let thread = unsafe { win32::OpenThread(win32::THREAD_ALL_ACCESS, 0, thread_id) };
+    if ptr::eq(thread, ptr::null_mut()) {
+        let err = unsafe { win32::GetLastError() };
+        Err(err)
+    } else {
+        Ok(thread)
     }
 }
