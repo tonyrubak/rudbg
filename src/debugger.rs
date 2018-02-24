@@ -60,7 +60,7 @@ pub fn load(path: &str) {
     let error_code: win32::DWORD;
 
     unsafe {
-        win32::CreateProcessW(path.as_ptr(),
+        return_code = win32::CreateProcessA(path.as_ptr(),
                              ptr::null_mut(), ptr::null_mut(), ptr::null_mut(), 0,
                              debug.creation_flags, ptr::null_mut(), ptr::null(),
                              &mut debug.startup_info as *mut _ as win32::LPVOID,
