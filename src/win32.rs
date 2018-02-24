@@ -14,6 +14,7 @@ pub type WORD = u16;
 
 pub const DEBUG_PROCESS: DWORD = 0x1;
 pub const CREATE_NEW_CONSOLE: DWORD = 0x10;
+pub const PROCESS_ALL_ACCESS: DWORD = (0x000F0000 | 0x00100000 | 0xFFF);
 
 
 /* StartupInfo structure for CreateProcessA() */
