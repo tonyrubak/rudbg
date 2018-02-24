@@ -4,5 +4,6 @@ mod debugger;
 mod win32;
 
 fn main() {
-    debugger::load("c:\\windows\\system32\\calc.exe");
+    let mut debugger = debugger::Debugger::new();
+    debugger::load(&mut debugger, "c:\\windows\\system32\\calc.exe");
 }

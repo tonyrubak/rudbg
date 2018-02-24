@@ -42,29 +42,28 @@ impl Debugger {
             }
         };
         dbg
-    }
+    }    
 }
 
-
-pub fn load(path: &str) {
-    let mut debug = Debugger::new();
-
+    
+pub fn load(debugger: &mut Debugger, path: &str) {
+    
     /* Set process creation and startup flags */
-    debug.creation_flags = win32::DEBUG_PROCESS;
-    debug.startup_info.dwFlags = 0x1; // Start up the process with the current process as the debugger
-    debug.startup_info.wShowWindow = 0x0;
-
-    debug.startup_info.cb = mem::size_of::<win32::StartupInfo>() as u32;
-
+    debugger.creation_flags = win32::DEBUG_PROCESS;
+    debugger.startup_info.dwFlags = 0x1; // Start up the process with the current process as the debugger
+    debugger.startup_info.wShowWindow = 0x0;
+    
+    debugger.startup_info.cb = mem::size_of::<win32::StartupInfo>() as u32;
+    
     let return_code: win32::BOOL;
     let error_code: win32::DWORD;
-
+    
     unsafe {
         return_code = win32::CreateProcessA(path.as_ptr(),
-                             ptr::null_mut(), ptr::null_mut(), ptr::null_mut(), 0,
-                             debug.creation_flags, ptr::null_mut(), ptr::null(),
-                             &mut debug.startup_info as *mut _ as win32::LPVOID,
-                             &mut debug.process_info as *mut _ as win32::LPVOID);
+                                            ptr::null_mut(), ptr::null_mut(), ptr::null_mut(), 0,
+                                            debugger.creation_flags, ptr::null_mut(), ptr::null(),
+                                            &mut debugger.startup_info as *mut _ as win32::LPVOID,
+                                            &mut debugger.process_info as *mut _ as win32::LPVOID);
         error_code = win32::GetLastError();      
     }
     
@@ -75,5 +74,5 @@ pub fn load(path: &str) {
     }
     
     println!("Process launched successfully.");
-    println!("PID: {}", debug.process_info.dwProcessId);
+    println!("PID: {}", debugger.process_info.dwProcessId);
 }
