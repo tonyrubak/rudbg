@@ -65,15 +65,15 @@ pub fn load(path: &str) {
                              debug.creation_flags, ptr::null_mut(), ptr::null(),
                              &mut debug.startup_info as *mut _ as win32::LPVOID,
                              &mut debug.process_info as *mut _ as win32::LPVOID);
-        error_code = win32::GetLastError();
-        
+        error_code = win32::GetLastError();      
     }
-    if return_code != 0 {
-        println!("Process launched successfully.");
-        println!("PID: {}", debug.process_info.dwProcessId);
-    }
-    else {
+    
+    if return_code == 0 {
         println!("Process failed to launch :(");
         println!("Error code: {}", error_code);
+        return;
     }
+    
+    println!("Process launched successfully.");
+    println!("PID: {}", debug.process_info.dwProcessId);
 }
