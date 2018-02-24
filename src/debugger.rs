@@ -6,13 +6,19 @@ use std::ptr;
 pub struct Debugger {
     creation_flags: win32::DWORD,
     startup_info: win32::StartupInfo,
-    process_info: win32::ProcessInformation
+    process_info: win32::ProcessInformation,
+    pid: win32::DWORD,
+    process: win32::HANDLE,
+    attached: bool
 }
 
 impl Debugger {
     pub fn new() -> Debugger {
         let dbg = Debugger {
             creation_flags: 0x0,
+            pid: 0,
+            process: ptr::null_mut(),
+            attached: false,
             startup_info: win32::StartupInfo {
                 cb: 0,
                 lpReserved: &mut 0,
@@ -45,7 +51,8 @@ impl Debugger {
     }    
 }
 
-    
+/* Load runs a new process and sets the debugger pid to the run process,
+you must still attach(debugger, pid) to actually run the debugger */
 pub fn load(debugger: &mut Debugger, path: &str) {
     
     /* Set process creation and startup flags */
@@ -72,7 +79,32 @@ pub fn load(debugger: &mut Debugger, path: &str) {
         println!("Error code: {}", error_code);
         return;
     }
+
+    debugger.pid = debugger.process_info.dwProcessId;
     
     println!("Process launched successfully.");
-    println!("PID: {}", debugger.process_info.dwProcessId);
+    println!("PID: {}", debugger.pid);
+
+    debugger.process = unsafe { win32::OpenProcess(win32::PROCESS_ALL_ACCESS, 0, debugger.pid) };
+}
+
+pub fn attach(debugger: &mut Debugger, pid: win32::DWORD) {
+    debugger.pid = pid;
+    debugger.process = unsafe { win32::OpenProcess(win32::PROCESS_ALL_ACCESS, 0, pid) };
+    let res = unsafe { win32::DebugActiveProcess(debugger.pid) };
+    if res != 0 {
+        debugger.attached = true;
+        debug(debugger);
+    }
+    else {
+        let err = unsafe { win32::GetLastError() };
+        println!("Attaching to process {} failed.", pid);
+        println!("Error code: {}", err);
+    }
+}
+
+pub fn debug(debugger: &mut Debugger) {
+    while debugger.attached {
+        
+    }
 }
