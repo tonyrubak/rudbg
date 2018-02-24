@@ -150,7 +150,7 @@ extern "stdcall" {
     pub fn DebugActiveProcess(dwProcessId: DWORD) -> BOOL;
     pub fn DebugActiveProcessStop(dwProcessId: DWORD) -> BOOL;
     pub fn GetLastError() -> DWORD;
-    pub fn GetThreadContext(hThread: HANDLE,
+    pub fn Wow64GetThreadContext(hThread: HANDLE,
                             lpContext: LPCONTEXT) -> BOOL;
     pub fn OpenProcess(dwDesiredAccess: DWORD,
                        bInheritHandle: BOOL,
