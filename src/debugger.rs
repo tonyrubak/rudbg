@@ -94,7 +94,6 @@ pub fn attach(debugger: &mut Debugger, pid: win32::DWORD) {
     let res = unsafe { win32::DebugActiveProcess(debugger.pid) };
     if res != 0 {
         debugger.attached = true;
-        debug(debugger);
     }
     else {
         let err = unsafe { win32::GetLastError() };
@@ -211,7 +210,7 @@ pub fn get_thread_context(debugger: &Debugger, thread_id: win32::DWORD) -> Resul
         Ok(t) => t,
         Err(e) => { return Err(e); }
     };
-    if unsafe { win32::GetThreadContext(thread, &mut context as *mut _) } != 0 {
+    if unsafe { win32::Wow64GetThreadContext(thread, &mut context as *mut _) } != 0 {
         unsafe { win32::CloseHandle(thread) };
         Ok(context)
     } else {
