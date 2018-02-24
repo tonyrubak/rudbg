@@ -66,5 +66,9 @@ extern "stdcall" {
                          lpStartupInfo: LPVOID,
                          lpProcessInformation: LPVOID
                          ) -> BOOL;
+    pub fn DebugActiveProcess(dwProcessId: DWORD) -> BOOL;
     pub fn GetLastError() -> DWORD;
+    pub fn OpenProcess(dwDesiredAccess: DWORD,
+                       bInheritHandle: BOOL,
+                       dwProcessId: DWORD) -> HANDLE;
 }
