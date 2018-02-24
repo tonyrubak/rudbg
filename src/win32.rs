@@ -8,12 +8,14 @@ pub type BYTE = u8;
 pub type HANDLE = *mut raw::c_void;
 pub type LONG = i32;
 pub type LPBYTE = *mut u8;
-pub type LPCONTEXT = *mut Context;
+pub type LPCONTEXT = *mut CONTEXT;
 pub type LPSECURITY_ATTRIBUTES = *mut raw::c_void;
 pub type LPTHREADENTRY32 = *mut THREADENTRY32;
 pub type LPTSTR = *mut u8;
 pub type LPVOID = *mut raw::c_void;
 pub type LPCTSTR = *const u8;
+pub type PBOOL = *mut BOOL;
+pub type PWOW64_CONTEXT = *mut WOW64_CONTEXT;
 pub type UCHAR = u8;
 pub type ULONG = u32;
 pub type ULONG_PTR = *mut u32;
@@ -32,7 +34,11 @@ pub const TH32CS_SNAPTHREAD: DWORD = 0x00000004;
 pub const THREAD_ALL_ACCESS: DWORD = 0x001F03FF;
 
 #[repr(C)]
-pub struct Context {
+pub struct CONTEXT {
+}
+
+#[repr(C)]
+pub struct WOW64_CONTEXT {
     pub ContextFlags: DWORD,
     pub Dr0: DWORD,
     pub Dr1: DWORD,
@@ -150,8 +156,8 @@ extern "stdcall" {
     pub fn DebugActiveProcess(dwProcessId: DWORD) -> BOOL;
     pub fn DebugActiveProcessStop(dwProcessId: DWORD) -> BOOL;
     pub fn GetLastError() -> DWORD;
-    pub fn Wow64GetThreadContext(hThread: HANDLE,
-                            lpContext: LPCONTEXT) -> BOOL;
+    pub fn IsWow64Process(hProcess: HANDLE,
+                          Wow64Process: PBOOL) -> BOOL;
     pub fn OpenProcess(dwDesiredAccess: DWORD,
                        bInheritHandle: BOOL,
                        dwProcessId: DWORD) -> HANDLE;
@@ -166,4 +172,6 @@ extern "stdcall" {
                         lpte: LPTHREADENTRY32) -> BOOL;
     pub fn WaitForDebugEvent(lpDebugEvent: LPVOID,
                              dwMilliseconds: DWORD) -> BOOL;
+    pub fn Wow64GetThreadContext(hThread: HANDLE,
+                                 lpContext: PWOW64_CONTEXT) -> BOOL;
 }

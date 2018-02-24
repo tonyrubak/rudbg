@@ -1,5 +1,6 @@
 use win32;
 
+use either;
 use std::mem;
 use std::ptr;
 
@@ -169,8 +170,27 @@ pub fn enumerate_threads(debugger: &Debugger) -> Result<Vec<win32::DWORD>, win32
     }
 }
 
-pub fn get_thread_context32(debugger: &Debugger, thread_id: win32::DWORD) -> Result<win32::Context, win32::DWORD> {
-    let mut context = win32::Context {
+pub fn get_thread_context(debugger: &Debugger, thread_id: win32::DWORD) ->
+    Result<either::Either<win32::CONTEXT,win32::WOW64_CONTEXT>, win32::DWORD> {
+    if is_wow64_process(&debugger) {
+        match get_thread_context32(&debugger, thread_id) {
+            Ok(ctx) => Ok(either::Right(ctx)),
+            Err(err) => Err(err)
+        }
+    } else {
+        match get_thread_context64(&debugger, thread_id) {
+            Ok(ctx) => Ok(either::Left(ctx)),
+            Err(err) => Err(err)
+        }
+    }
+}
+
+fn get_thread_context64(debugger: &Debugger, thread_id: win32::DWORD) -> Result<win32::CONTEXT, win32::DWORD> {
+    Err(0)
+}
+
+fn get_thread_context32(debugger: &Debugger, thread_id: win32::DWORD) -> Result<win32::WOW64_CONTEXT, win32::DWORD> {
+    let mut context = win32::WOW64_CONTEXT {
         ContextFlags: win32::CONTEXT_DEBUG_REGISTERS | win32::CONTEXT_FULL,
         Dr0: 0,
         Dr1: 0,
@@ -216,6 +236,27 @@ pub fn get_thread_context32(debugger: &Debugger, thread_id: win32::DWORD) -> Res
     } else {
         let err = unsafe { win32::GetLastError() };
         Err(err)
+    }
+}
+
+pub fn is_wow64_process(debugger: &Debugger) -> bool {
+    let mut res: win32::BOOL = 0;
+
+    if ptr::eq(debugger.process,ptr::null_mut()) {
+        return false;
+    } else {
+        let rv = unsafe { win32::IsWow64Process(debugger.process, &mut res as win32::PBOOL) };
+        if rv == 0 {
+            let err = unsafe { win32::GetLastError() };
+            println!("Error code: {}", err);
+            panic!("IsWow64Process failed.");
+        }
+    }
+
+    if res != 0 {
+        true
+    } else {
+        false
     }
 }
 

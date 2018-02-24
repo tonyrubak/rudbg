@@ -1,3 +1,4 @@
+extern crate either;
 extern crate kernel32;
 
 mod debugger;
@@ -14,6 +15,10 @@ fn main() {
     let _ = io::stdin().read_line(&mut input);
     let pid = str::parse::<u32>(&input[..].trim()).unwrap();
     debugger::attach(&mut debugger, pid);
+    
+    if !debugger::is_wow64_process(&debugger) {
+        println!("Process is 64-bits");
+    }
     let threads = match debugger::enumerate_threads(&debugger) {
         Ok(v) => v,
         Err(e) => {
@@ -24,19 +29,27 @@ fn main() {
     };
 
     for thread in threads {
-        let ctx = match debugger::get_thread_context(&debugger, thread) {
-            Ok(c) => c,
+        let ctx: win32::CONTEXT;
+        let wow64ctx: win32::WOW64_CONTEXT;
+        
+        match debugger::get_thread_context(&debugger, thread) {
+            Ok(c) => match c {
+                either::Left(c) => {
+                    ctx = c;},
+                either::Right(c) => {
+                    wow64ctx = c;
+                    println!("Dumping attached process registers");
+                    println!("EIP: {}", wow64ctx.Eip);
+                    println!("ESP: {}", wow64ctx.Esp);
+                    println!("EBP: {}", wow64ctx.Ebp);
+                }
+            },
             Err(e) => {
                 println!("Error getting thread context!");
                 println!("Error code: {}", e);
                 return;
             }
         };
-        
-        println!("Dumping attached process registers");
-        println!("EIP: {}", ctx.Eip);
-        println!("ESP: {}", ctx.Esp);
-        println!("EBP: {}", ctx.Ebp);
     }
     debugger::detach(debugger);
 }
