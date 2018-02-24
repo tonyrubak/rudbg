@@ -239,7 +239,7 @@ fn get_thread_context32(debugger: &Debugger, thread_id: win32::DWORD) -> Result<
     }
 }
 
-pub fn is_wow64_process(debugger: &Debugger) -> bool {
+fn is_wow64_process(debugger: &Debugger) -> bool {
     let mut res: win32::BOOL = 0;
 
     if ptr::eq(debugger.process,ptr::null_mut()) {

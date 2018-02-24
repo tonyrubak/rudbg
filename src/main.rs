@@ -16,9 +16,6 @@ fn main() {
     let pid = str::parse::<u32>(&input[..].trim()).unwrap();
     debugger::attach(&mut debugger, pid);
     
-    if !debugger::is_wow64_process(&debugger) {
-        println!("Process is 64-bits");
-    }
     let threads = match debugger::enumerate_threads(&debugger) {
         Ok(v) => v,
         Err(e) => {
