@@ -169,7 +169,7 @@ pub fn enumerate_threads(debugger: &Debugger) -> Result<Vec<win32::DWORD>, win32
     }
 }
 
-pub fn get_thread_context(debugger: &Debugger, thread_id: win32::DWORD) -> Result<win32::Context, win32::DWORD> {
+pub fn get_thread_context32(debugger: &Debugger, thread_id: win32::DWORD) -> Result<win32::Context, win32::DWORD> {
     let mut context = win32::Context {
         ContextFlags: win32::CONTEXT_DEBUG_REGISTERS | win32::CONTEXT_FULL,
         Dr0: 0,
