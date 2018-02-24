@@ -162,8 +162,8 @@ pub fn enumerate_threads(debugger: &Debugger) -> Result<Vec<win32::DWORD>, win32
         while success != 0 {
             if thread_entry.th32OwnerProcessId == debugger.pid {
                 thread_list.push(thread_entry.th32ThreadId);
-                success = unsafe { win32::Thread32Next(snapshot, &mut thread_entry as *mut _) };
             }
+            success = unsafe { win32::Thread32Next(snapshot, &mut thread_entry as *mut _) };
         }
         unsafe { win32::CloseHandle(snapshot) };
         Ok(thread_list)
