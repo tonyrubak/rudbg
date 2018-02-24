@@ -1,5 +1,6 @@
 use win32;
 
+use std::io;
 use std::mem;
 use std::ptr;
 
@@ -105,6 +106,34 @@ pub fn attach(debugger: &mut Debugger, pid: win32::DWORD) {
 
 pub fn debug(debugger: &mut Debugger) {
     while debugger.attached {
-        
+        get_debug_event(debugger);
+    }
+}
+
+pub fn get_debug_event(debugger: &mut Debugger) {
+    let mut event = win32::DebugEvent {
+        dwDebugEventCode: 0,
+        dwProcessId: 0,
+        dwThreadId: 0,
+        u: [0u8; 160]
+    };
+    let status = win32::DBG_CONTINUE;
+
+    if unsafe { win32::WaitForDebugEvent(&mut event as *mut _ as win32::LPVOID, win32::INFINITE) } != 0 {
+        let _ = unsafe { win32::ContinueDebugEvent(event.dwProcessId, event.dwThreadId, status) };
+    }
+}
+
+pub fn detach(debugger: Debugger) -> bool {
+    let res = unsafe { win32::DebugActiveProcessStop(debugger.pid) };
+    if res != 0 {
+        println!("Finished debugging");
+        true
+    }
+    else {
+        let err = unsafe { win32::GetLastError() };
+        println!("Something went wrong!");
+        println!("Error code: {}", err);
+        false
     }
 }
