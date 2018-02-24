@@ -56,11 +56,24 @@ pub fn load(path: &str) {
 
     debug.startup_info.cb = mem::size_of::<win32::StartupInfo>() as u32;
 
+    let return_code: win32::BOOL;
+    let error_code: win32::DWORD;
+
     unsafe {
         win32::CreateProcessW(path.as_ptr(),
                              ptr::null_mut(), ptr::null_mut(), ptr::null_mut(), 0,
                              debug.creation_flags, ptr::null_mut(), ptr::null(),
                              &mut debug.startup_info as *mut _ as win32::LPVOID,
                              &mut debug.process_info as *mut _ as win32::LPVOID);
+        error_code = win32::GetLastError();
+        
+    }
+    if return_code != 0 {
+        println!("Process launched successfully.");
+        println!("PID: {}", debug.process_info.dwProcessId);
+    }
+    else {
+        println!("Process failed to launch :(");
+        println!("Error code: {}", error_code);
     }
 }

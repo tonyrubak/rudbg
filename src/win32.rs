@@ -55,7 +55,7 @@ pub struct SecurityAttributes {
 
 #[link(name = "kernel32")]
 extern "stdcall" {
-    pub fn CreateProcessW(lpApplicationName: LPCTSTR,
+    pub fn CreateProcessA(lpApplicationName: LPCTSTR,
                          lpCommandLine: LPTSTR,
                          lpProcessAttributes: LPSECURITY_ATTRIBUTES,
                          lpThreadAttributes: LPSECURITY_ATTRIBUTES,
