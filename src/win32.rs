@@ -66,4 +66,5 @@ extern "stdcall" {
                          lpStartupInfo: LPVOID,
                          lpProcessInformation: LPVOID
                          ) -> BOOL;
+    pub fn GetLastError() -> DWORD;
 }
