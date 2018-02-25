@@ -154,7 +154,7 @@ pub fn get_debug_event(debugger: &mut Debugger) {
                 Err(_) => { return; }
             };
         } else {
-            debugger.context64 = match get_thread_context64(event.dwThreadId) {
+            debugger.context64 = match get_thread_context64_from_id(event.dwThreadId) {
                 Ok(ctx) => ctx,
                 Err(_) => { return; }
                 };
@@ -244,14 +244,26 @@ pub fn get_thread_context(thread_id: win32::DWORD, wow64: win32::BOOL) ->
             Err(err) => Err(err)
         }
     } else {
-        match get_thread_context64(thread_id) {
+        match get_thread_context64_from_id(thread_id) {
             Ok(ctx) => Ok(either::Left(ctx)),
             Err(err) => Err(err)
         }
     }
 }
+fn get_thread_context64(hThread: win32::HANDLE) -> Result<win32::CONTEXT, win32::DWORD> {
+    let mut ctx = win32::CONTEXT::new();
+    ctx.ContextFlags = win32::CONTEXT_DEBUG_REGISTERS | win32::CONTEXT_FULL;
+    if unsafe { win32::GetThreadContext(hThread, &mut ctx as win32::LPCONTEXT) } != 0 {
+        unsafe { win32::CloseHandle(hThread) };
+        Ok(ctx)
+    } else {
+        let err = unsafe { win32::GetLastError() };
+        Err(err)
+    }    
+}
 
-fn get_thread_context64(thread_id: win32::DWORD) -> Result<win32::CONTEXT, win32::DWORD> {
+
+fn get_thread_context64_from_id(thread_id: win32::DWORD) -> Result<win32::CONTEXT, win32::DWORD> {
     let mut ctx = win32::CONTEXT::new();
     ctx.ContextFlags = win32::CONTEXT_DEBUG_REGISTERS | win32::CONTEXT_FULL;
     let thread = match open_thread(thread_id) {
