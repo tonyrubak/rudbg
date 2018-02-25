@@ -14,7 +14,7 @@ pub type LONG = i32;
 pub type LONGLONG = i64;
 pub type LPBYTE = *mut u8;
 pub type LPCONTEXT = *mut CONTEXT;
-pub type LPCSTR = *const u8;
+pub type LPCSTR = *const i8;
 pub type LPCVOID = *const raw::c_void;
 pub type LPDEBUG_EVENT = *mut DEBUG_EVENT;
 pub type LPSECURITY_ATTRIBUTES = *mut raw::c_void;
@@ -443,7 +443,7 @@ extern "stdcall" {
     pub fn DebugActiveProcess(dwProcessId: DWORD) -> BOOL;
     pub fn DebugActiveProcessStop(dwProcessId: DWORD) -> BOOL;
     pub fn GetLastError() -> DWORD;
-    pub fn GetModuleHandle(lpModuleName: LPCSTR) -> HANDLE;
+    pub fn GetModuleHandleA(lpModuleName: LPCSTR) -> HANDLE;
     pub fn GetProcAddress(hModule: HANDLE,
                           lpProcName: LPCSTR) -> FARPROC;
     pub fn GetThreadContext(hThread: HANDLE,
