@@ -1,6 +1,7 @@
 #![allow(non_snake_case)]
 #![allow(non_camel_case_types)]
 use std::os::raw;
+use std::ptr;
 /* Types */
 
 pub type BOOL = i16;
@@ -19,6 +20,7 @@ pub type LPTSTR = *mut u8;
 pub type LPVOID = *mut raw::c_void;
 pub type LPCTSTR = *const u8;
 pub type PBOOL = *mut BOOL;
+pub type PVOID = *mut raw::c_void;
 pub type PWOW64_CONTEXT = *mut WOW64_CONTEXT;
 pub type UCHAR = u8;
 pub type ULONG = u32;
@@ -32,6 +34,7 @@ pub const CONTEXT_DEBUG_REGISTERS: DWORD =  0x00010010;
 pub const CONTEXT_FULL: DWORD = 0x00010007;
 pub const CREATE_NEW_CONSOLE: DWORD = 0x10;
 pub const DBG_CONTINUE: DWORD = 0x00010002;
+pub const EXCEPTION_MAXIMUM_PARAMETERS: usize = 15;
 pub const INFINITE: DWORD = 0xFFFFFFFF;
 pub const MAXIMUM_SUPPORTED_EXTENSION: usize = 512;
 pub const PROCESS_ALL_ACCESS: DWORD = (0x000F0000 | 0x00100000 | 0xFFF);
@@ -48,6 +51,12 @@ pub const LOAD_DLL_DEBUG_EVENT: DWORD = 0x6;
 pub const UNLOAD_DLL_DEBUG_EVENT: DWORD = 0x7;
 pub const OUTPUT_DEBUG_STRING_EVENT: DWORD = 0x8;
 pub const RIP_EVENT: DWORD = 0x9;
+
+// Debug exception codes
+pub const EXCEPTION_ACCESS_VIOLATION: DWORD = 0xC0000005;
+pub const EXCEPTION_BREAKPOINT: DWORD = 0x80000003;
+pub const EXCEPTION_GUARD_PAGE: DWORD = 0x80000001;
+pub const EXCEPTION_SINGLE_STEP: DWORD = 0x80000004;
 
 // This type is needed to force CONTEXT to align to 16 bytes
 #[repr(simd)]
@@ -255,7 +264,7 @@ pub struct WOW64_CONTEXT {
 
 impl WOW64_CONTEXT {
     pub fn new() -> WOW64_CONTEXT {
-        let mut ctx = WOW64_CONTEXT {
+        let ctx = WOW64_CONTEXT {
             ContextFlags: 0,
             Dr0: 0,
             Dr1: 0,
@@ -318,7 +327,44 @@ pub struct FLOATING_SAVE_AREA {
     pub RegisterArea: [UCHAR; 80],
     pub Cr0NpxState: ULONG,
 }
-    
+
+#[repr(C)]
+pub struct EXCEPTION_DEBUG_INFO {
+    pub ExceptionRecord: EXCEPTION_RECORD,
+    pub dwFirstChance: DWORD,
+}
+
+impl EXCEPTION_DEBUG_INFO {
+    pub fn new() -> EXCEPTION_DEBUG_INFO {
+        EXCEPTION_DEBUG_INFO {
+            ExceptionRecord: EXCEPTION_RECORD::new(),
+            dwFirstChance: 0,
+        }
+    }
+}
+
+#[repr(C)]
+pub struct EXCEPTION_RECORD {
+    pub ExceptionCode: DWORD,
+    pub ExceptionFlags: DWORD,
+    pub ExceptionRecord: *const EXCEPTION_RECORD,
+    pub ExceptionAddress: PVOID,
+    pub NumberParameters: DWORD,
+    pub ExceptionInformation: [ULONG_PTR; EXCEPTION_MAXIMUM_PARAMETERS],
+}
+
+impl EXCEPTION_RECORD {
+    pub fn new() -> EXCEPTION_RECORD {
+        EXCEPTION_RECORD {
+            ExceptionCode: 0,
+            ExceptionFlags: 0,
+            ExceptionRecord: ptr::null(),
+            ExceptionAddress: ptr::null_mut(),
+            NumberParameters: 0,
+            ExceptionInformation: [ptr::null_mut(); EXCEPTION_MAXIMUM_PARAMETERS],
+        }
+    }
+}
 
 /* StartupInfo structure for CreateProcessA() */
 pub struct StartupInfo {
@@ -361,7 +407,13 @@ pub struct DEBUG_EVENT {
     pub dwDebugEventCode: DWORD,
     pub dwProcessId: DWORD,
     pub dwThreadId: DWORD,
-    pub u: [u8; 160]
+    pub u: DEBUG_EVENT_UNION, //[u8; 160]
+}
+
+#[repr(C)]
+pub union DEBUG_EVENT_UNION {
+    pub blob: [u8; 160],
+    pub Exception: EXCEPTION_DEBUG_INFO,
 }
 
 /* Import the functions from kernel32.dll that we need */
