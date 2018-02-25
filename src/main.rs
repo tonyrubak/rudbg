@@ -18,6 +18,9 @@ fn main() {
     let _ = io::stdin().read_line(&mut input);
     let pid = str::parse::<u32>(&input[..].trim()).unwrap();
     debugger::attach(&mut debugger, pid);
+    let printf_address = debugger::resolve_function("msvcrt.dll", "printf");
+    println!("Address of printf: {}", printf_address as u32);
+    debugger::bp_set(&mut debugger, printf_address);
     debugger::debug(&mut debugger);
     debugger::detach(&mut debugger);
 }

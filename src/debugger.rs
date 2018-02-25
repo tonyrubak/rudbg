@@ -2,8 +2,10 @@ use win32;
 
 use either;
 use std::collections::HashMap;
+use std::ffi;
 use std::mem;
 use std::ptr;
+use std::slice;
 
 pub struct Debugger {
     creation_flags: win32::DWORD,
@@ -134,7 +136,7 @@ pub fn debug(debugger: &mut Debugger) {
     }
 }
 
-pub fn get_debug_event(debugger: &mut Debugger) {
+pub fn get_debug_event(mut debugger: &mut Debugger) {
     let mut event = win32::DEBUG_EVENT {
         dwDebugEventCode: 0,
         dwProcessId: 0,
@@ -168,7 +170,7 @@ pub fn get_debug_event(debugger: &mut Debugger) {
             if debugger.exception_code == win32::EXCEPTION_ACCESS_VIOLATION {
                 println!("Access violation detected");
             } else if debugger.exception_code == win32::EXCEPTION_BREAKPOINT {
-                status = exception_handler_breakpoint(&debugger);
+                status = exception_handler_breakpoint(&mut debugger);
             } else if debugger.exception_code == win32::EXCEPTION_GUARD_PAGE {
                 println!("Guard page access detected");
             } else if debugger.exception_code == win32::EXCEPTION_SINGLE_STEP {
@@ -326,9 +328,29 @@ fn open_thread(thread_id: win32::DWORD) -> Result<win32::HANDLE, win32::DWORD> {
     }
 }
 
-fn exception_handler_breakpoint(debugger: &Debugger) -> win32::DWORD {
+fn exception_handler_breakpoint(debugger: &mut Debugger) -> win32::DWORD {
     println!("Handling breakpoint");
-    println!("Exception address: {}", debugger.exception_address as u32);
+    println!("Exception address: 0x{:x}", debugger.exception_address as u32);
+    if !debugger.breakpoints.contains_key(&(debugger.exception_address as win32::LPCVOID)) {
+        println!("Hit system breaktpoint");
+    } else {
+        println!("Hit user-defined breakpoint");
+        let (ptr, len) = debugger.breakpoints[&(debugger.exception_address as win32::LPCVOID)];
+        let _ = write_process_memory(&debugger, debugger.exception_address,
+                             unsafe { slice::from_raw_parts(ptr, len) });
+        if debugger.wow64 == 0 {
+            debugger.context64 = match get_thread_context64(debugger.thread) {
+                Ok(ctx) => ctx,
+                Err(_) => { panic!("Error getting thread context in breakpoint."); }
+            };
+            debugger.context64.Rip -= 1;
+            let _ = unsafe { win32::SetThreadContext(debugger.thread,
+                                                     &mut debugger.context64 as win32::LPCONTEXT) };
+        }
+        else {
+            panic!("Can't handle breakpoints in 32-bit images yet");
+        }
+    }
     win32::DBG_CONTINUE
 }
 
@@ -369,7 +391,7 @@ fn write_process_memory(debugger: &Debugger, address: win32::LPCVOID, data: &[u8
     }
 }
 
-fn bp_set(debugger: &mut Debugger, address: win32::LPCVOID) -> win32::DWORD {
+pub fn bp_set(debugger: &mut Debugger, address: win32::LPCVOID) -> win32::DWORD {
     if !debugger.breakpoints.contains_key(&address) {
         let b = match read_process_memory(&debugger, address, 1) {
             Ok(buf) => buf,
@@ -381,8 +403,11 @@ fn bp_set(debugger: &mut Debugger, address: win32::LPCVOID) -> win32::DWORD {
     0
 }
 
-unsafe fn resolve_function(dll_name: &str, function_name: &str) -> win32::FARPROC {
-    let handle = win32::GetModuleHandle(dll_name.as_ptr());
-    let address = win32::GetProcAddress(handle, function_name.as_ptr());
+pub fn resolve_function(dll_name: &str, function_name: &str) -> win32::FARPROC {
+    let address: win32::FARPROC;
+    unsafe {
+        let handle = win32::GetModuleHandleA(ffi::CString::new(dll_name).unwrap().as_ptr());
+        address = win32::GetProcAddress(handle, ffi::CString::new(function_name).unwrap().as_ptr());
+    }
     address
 }
