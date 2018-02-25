@@ -97,21 +97,28 @@ pub fn load(debugger: &mut Debugger, path: &str) {
     debugger.process = unsafe { win32::OpenProcess(win32::PROCESS_ALL_ACCESS, 0, debugger.pid) };
 }
 
-pub fn attach(debugger: &mut Debugger, pid: win32::DWORD) {
-    debugger.pid = pid;
+pub fn attach(debugger: &mut Debugger, pid: win32::DWORD) -> u32 {
+    let retval: u32;
     debugger.process = unsafe { win32::OpenProcess(win32::PROCESS_ALL_ACCESS, 0, pid) };
-    let res = unsafe { win32::DebugActiveProcess(debugger.pid) };
-    if res != 0 {
-        debugger.attached = true;
-        let mut wow64 = 0i16;
-        let res = unsafe { win32::IsWow64Process(debugger.process, &mut wow64 as win32::PBOOL) };
-        debugger.wow64 = wow64;
+    if ptr::eq(debugger.process,ptr::null_mut()) {
+        retval = unsafe { win32::GetLastError() };
+    } else {
+        let res = unsafe { win32::DebugActiveProcess(pid) };
+        if res != 0 {
+            debugger.attached = true;
+            debugger.pid = pid;
+            let mut wow64 = 0i16;
+            let _ = unsafe { win32::IsWow64Process(debugger.process, &mut wow64 as win32::PBOOL) };
+            debugger.wow64 = wow64;
+            retval = 0;
+        }
+        else {
+            retval = unsafe { win32::GetLastError() };
+            println!("Attaching to process {} failed.", pid);
+            println!("Error code: {}", retval);
+        }
     }
-    else {
-        let err = unsafe { win32::GetLastError() };
-        println!("Attaching to process {} failed.", pid);
-        println!("Error code: {}", err);
-    }
+    retval
 }
 
 pub fn debug(debugger: &mut Debugger) {
