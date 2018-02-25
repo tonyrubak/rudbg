@@ -103,7 +103,9 @@ pub fn attach(debugger: &mut Debugger, pid: win32::DWORD) {
     let res = unsafe { win32::DebugActiveProcess(debugger.pid) };
     if res != 0 {
         debugger.attached = true;
-        let res = unsafe { win32::IsWow64Process(debugger.process, &mut debugger.wow64 as win32::PBOOL) };
+        let mut wow64 = 0i16;
+        let res = unsafe { win32::IsWow64Process(debugger.process, &mut wow64 as win32::PBOOL) };
+        debugger.wow64 = wow64;
     }
     else {
         let err = unsafe { win32::GetLastError() };
