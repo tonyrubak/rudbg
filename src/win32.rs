@@ -8,11 +8,14 @@ pub type BOOL = i16;
 pub type BYTE = u8;
 pub type DWORD = u32;
 pub type DWORD64 = u64;
+pub type FARPROC = *const raw::c_void;
 pub type HANDLE = *mut raw::c_void;
 pub type LONG = i32;
 pub type LONGLONG = i64;
 pub type LPBYTE = *mut u8;
 pub type LPCONTEXT = *mut CONTEXT;
+pub type LPCSTR = *const u8;
+pub type LPCVOID = *const raw::c_void;
 pub type LPDEBUG_EVENT = *mut DEBUG_EVENT;
 pub type LPSECURITY_ATTRIBUTES = *mut raw::c_void;
 pub type LPTHREADENTRY32 = *mut THREADENTRY32;
@@ -22,6 +25,7 @@ pub type LPCTSTR = *const u8;
 pub type PBOOL = *mut BOOL;
 pub type PVOID = *mut raw::c_void;
 pub type PWOW64_CONTEXT = *mut WOW64_CONTEXT;
+pub type SIZE_T = usize;
 pub type UCHAR = u8;
 pub type ULONG = u32;
 pub type ULONGLONG = u64;
@@ -439,6 +443,9 @@ extern "stdcall" {
     pub fn DebugActiveProcess(dwProcessId: DWORD) -> BOOL;
     pub fn DebugActiveProcessStop(dwProcessId: DWORD) -> BOOL;
     pub fn GetLastError() -> DWORD;
+    pub fn GetModuleHandle(lpModuleName: LPCSTR) -> HANDLE;
+    pub fn GetProcAddress(hModule: HANDLE,
+                          lpProcName: LPCSTR) -> FARPROC;
     pub fn GetThreadContext(hThread: HANDLE,
                             lpContext: LPCONTEXT) -> BOOL;
     pub fn IsWow64Process(hProcess: HANDLE,
@@ -449,6 +456,11 @@ extern "stdcall" {
     pub fn OpenThread(dwDesiredAccess: DWORD,
                       bInheritHandle: BOOL,
                       dwThreadId: DWORD) -> HANDLE;
+    pub fn ReadProcessMemory(hProcess: HANDLE,
+                             lpBaseAddress: LPCVOID,
+                             lpBuffer: LPVOID,
+                             nSize: SIZE_T,
+                             lpNumberOfBytesRead: *mut SIZE_T) -> BOOL;
     pub fn SetThreadContext(hThread: HANDLE,
                             lpContext: LPCONTEXT) -> BOOL;
     pub fn Thread32First(hSnapshot: HANDLE,
@@ -459,4 +471,9 @@ extern "stdcall" {
                              dwMilliseconds: DWORD) -> BOOL;
     pub fn Wow64GetThreadContext(hThread: HANDLE,
                                  lpContext: PWOW64_CONTEXT) -> BOOL;
+    pub fn WriteProcessMemory(hProcess: HANDLE,
+                              lpBaseAddress: LPCVOID,
+                              lpBuffer: LPCVOID,
+                              nSize: SIZE_T,
+                              lpNumberOfBytesWritten: *mut SIZE_T) -> BOOL;
 }
