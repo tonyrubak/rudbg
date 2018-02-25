@@ -27,7 +27,7 @@ fn main() {
     };
 
     for thread in threads {
-         match debugger::get_thread_context(&debugger, thread) {
+         match debugger::get_thread_context(&mut debugger, thread) {
             Ok(c) => match c {
                 either::Left(c) => {
                     println!("Dumping attached process registers");
@@ -36,7 +36,6 @@ fn main() {
                     println!("EBP: {}", c.Rbp);
                 },
                 either::Right(c) => {
-                    wow64ctx = c;
                     println!("Dumping attached process registers");
                     println!("EIP: {}", c.Eip);
                     println!("ESP: {}", c.Esp);
