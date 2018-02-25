@@ -406,7 +406,7 @@ fn write_process_memory(debugger: &Debugger, address: win32::LPCVOID, data: &[u8
                                                  data.as_ptr() as win32::LPCVOID,
                                                  length,
                                                  &mut written as *mut win32::SIZE_T) };
-
+    
     if res == 0 {
         unsafe { win32::GetLastError() }
     } else {
