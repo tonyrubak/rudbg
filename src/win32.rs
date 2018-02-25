@@ -37,6 +37,10 @@ pub const PROCESS_ALL_ACCESS: DWORD = (0x000F0000 | 0x00100000 | 0xFFF);
 pub const TH32CS_SNAPTHREAD: DWORD = 0x00000004;
 pub const THREAD_ALL_ACCESS: DWORD = 0x001F03FF;
 
+// This type is needed to force CONTEXT to align to 16 bytes
+#[repr(simd)]
+pub struct ALIGNMENT(pub u64, pub u64);
+
 #[repr(C)]
 pub struct CONTEXT {
     pub P1Home: DWORD64,
@@ -85,6 +89,7 @@ pub struct CONTEXT {
     pub LastBranchFromRip: DWORD64,
     pub LastExceptionToRip: DWORD64,
     pub LastExceptionFromRip: DWORD64,
+    pub _align: [ALIGNMENT; 0] // Aligment to 16 bytes for CONTEXT
 }
 
 #[repr(C)]
@@ -232,6 +237,8 @@ extern "stdcall" {
     pub fn DebugActiveProcess(dwProcessId: DWORD) -> BOOL;
     pub fn DebugActiveProcessStop(dwProcessId: DWORD) -> BOOL;
     pub fn GetLastError() -> DWORD;
+    pub fn GetThreadContext(hThread: HANDLE,
+                            lpContext: LPCONTEXT) -> BOOL;
     pub fn IsWow64Process(hProcess: HANDLE,
                           Wow64Process: PBOOL) -> BOOL;
     pub fn OpenProcess(dwDesiredAccess: DWORD,
