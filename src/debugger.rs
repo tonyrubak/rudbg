@@ -20,7 +20,7 @@ pub struct Debugger {
     exception_code: win32::DWORD,
     exception_address: win32::PVOID,
     attached: bool,
-    breakpoints: HashMap<win32::LPCVOID, (*const u8, usize)>,
+    breakpoints: HashMap<win32::LPCVOID, Vec::<u8>>,
 }
 
 impl Debugger {
