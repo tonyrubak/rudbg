@@ -1,4 +1,6 @@
 #![feature(repr_simd)]
+#![feature(untagged_unions)]
+
 extern crate either;
 extern crate kernel32;
 
@@ -17,5 +19,5 @@ fn main() {
     let pid = str::parse::<u32>(&input[..].trim()).unwrap();
     debugger::attach(&mut debugger, pid);
     debugger::debug(&mut debugger);
-    debugger::detach(debugger);
+    debugger::detach(&mut debugger);
 }

@@ -14,6 +14,8 @@ pub struct Debugger {
     context32: win32::WOW64_CONTEXT,
     context64: win32::CONTEXT,
     wow64: win32::BOOL,
+    exception_code: win32::DWORD,
+    exception_address: win32::PVOID,
     attached: bool,
 }
 
@@ -27,6 +29,8 @@ impl Debugger {
             context32: win32::WOW64_CONTEXT::new(),
             context64: win32::CONTEXT::new(),
             wow64: 0,
+            exception_code: 0,
+            exception_address: ptr::null_mut(),
             attached: false,
             startup_info: win32::StartupInfo {
                 cb: 0,
@@ -132,9 +136,9 @@ pub fn get_debug_event(debugger: &mut Debugger) {
         dwDebugEventCode: 0,
         dwProcessId: 0,
         dwThreadId: 0,
-        u: [0u8; 160]
+        u: win32::DEBUG_EVENT_UNION { blob: [0u8; 160] },
     };
-    let status = win32::DBG_CONTINUE;
+    let mut status = win32::DBG_CONTINUE;
 
     if unsafe { win32::WaitForDebugEvent(&mut event as win32::LPDEBUG_EVENT, win32::INFINITE) } != 0 {
         debugger.thread = match open_thread(event.dwThreadId) {
@@ -152,6 +156,23 @@ pub fn get_debug_event(debugger: &mut Debugger) {
                 Err(_) => { return; }
                 };
         }
+
+        if event.dwDebugEventCode == win32::EXCEPTION_DEBUG_EVENT {
+            unsafe {
+                debugger.exception_code = event.u.Exception.ExceptionRecord.ExceptionCode;
+                debugger.exception_address = event.u.Exception.ExceptionRecord.ExceptionAddress;
+            }
+            if debugger.exception_code == win32::EXCEPTION_ACCESS_VIOLATION {
+                println!("Access violation detected");
+            } else if debugger.exception_code == win32::EXCEPTION_BREAKPOINT {
+                status = exception_handler_breakpoint(&debugger);
+            } else if debugger.exception_code == win32::EXCEPTION_GUARD_PAGE {
+                println!("Guard page access detected");
+            } else if debugger.exception_code == win32::EXCEPTION_SINGLE_STEP {
+                println!("Single step.");
+            }
+        }
+        
         println!("Event code: {evcode} Thread ID: {thread}", evcode = event.dwDebugEventCode,
                  thread = event.dwThreadId);
         let _ = unsafe { win32::ContinueDebugEvent(event.dwProcessId, event.dwThreadId, status) };
@@ -288,4 +309,10 @@ fn open_thread(thread_id: win32::DWORD) -> Result<win32::HANDLE, win32::DWORD> {
     } else {
         Ok(thread)
     }
+}
+
+fn exception_handler_breakpoint(debugger: &Debugger) -> win32::DWORD {
+    println!("Handling breakpoint");
+    println!("Exception address: {}", debugger.exception_address as u32);
+    win32::DBG_CONTINUE
 }
