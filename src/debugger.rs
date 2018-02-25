@@ -10,7 +10,11 @@ pub struct Debugger {
     process_info: win32::ProcessInformation,
     pid: win32::DWORD,
     process: win32::HANDLE,
-    attached: bool
+    thread: win32::HANDLE,
+    context32: win32::WOW64_CONTEXT,
+    context64: win32::CONTEXT,
+    wow64: win32::BOOL,
+    attached: bool,
 }
 
 impl Debugger {
@@ -19,6 +23,10 @@ impl Debugger {
             creation_flags: 0x0,
             pid: 0,
             process: ptr::null_mut(),
+            thread: ptr::null_mut(),
+            context32: win32::WOW64_CONTEXT::new(),
+            context64: win32::CONTEXT::new(),
+            wow64: 0,
             attached: false,
             startup_info: win32::StartupInfo {
                 cb: 0,
