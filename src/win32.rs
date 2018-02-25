@@ -12,6 +12,7 @@ pub type LONG = i32;
 pub type LONGLONG = i64;
 pub type LPBYTE = *mut u8;
 pub type LPCONTEXT = *mut CONTEXT;
+pub type LPDEBUG_EVENT = *mut DEBUG_EVENT;
 pub type LPSECURITY_ATTRIBUTES = *mut raw::c_void;
 pub type LPTHREADENTRY32 = *mut THREADENTRY32;
 pub type LPTSTR = *mut u8;
@@ -103,6 +104,101 @@ pub struct CONTEXT {
     pub _align: [ALIGNMENT; 0] // Aligment to 16 bytes for CONTEXT
 }
 
+impl CONTEXT {
+    pub fn new() -> CONTEXT {
+        let ctx = CONTEXT {
+            P1Home: 0,
+            P2Home: 0,
+            P3Home: 0,
+            P4Home: 0,
+            P5Home: 0,
+            P6Home: 0,
+            ContextFlags: 0,
+            MxCsr: 0,
+            SegCs: 0,
+            SegDs: 0,
+            SegEs: 0,
+            SegFs: 0,
+            SegGs: 0,
+            SegSs: 0,
+            EFlags: 0,
+            Dr0: 0,
+            Dr1: 0,
+            Dr2: 0,
+            Dr3: 0,
+            Dr6: 0,
+            Dr7: 0,
+            Rax: 0,
+            Rcx: 0,
+            Rdx: 0,
+            Rbx: 0,
+            Rsp: 0,
+            Rbp: 0,
+            Rsi: 0,
+            Rdi: 0,
+            R8: 0,
+            R9: 0,
+            R10: 0,
+            R11: 0,
+            R12: 0,
+            R13: 0,
+            R14: 0,
+            R15: 0,
+            Rip: 0,
+            FltSave: XMM_SAVE_AREA32 {
+                ControlWord: 0,
+                StatusWord: 0,
+                TagWord: 0,
+                Reserved1: 0,
+                ErrorOpcode: 0,
+                ErrorOffset: 0,
+                ErrorSelector: 0,
+                Reserved2: 0,
+                DataOffset: 0,
+                DataSelector: 0,
+                Reserved3: 0,
+                MxCsr: 0,
+                MxCsr_Mask: 0,
+                FloatRegisters: [M128A {Low: 0, High: 0},M128A {Low: 0, High: 0},
+                                 M128A {Low: 0, High: 0},M128A {Low: 0, High: 0},
+                                 M128A {Low: 0, High: 0},M128A {Low: 0, High: 0},
+                                 M128A {Low: 0, High: 0},M128A {Low: 0, High: 0}],
+                XmmRegisters: [M128A {Low: 0, High: 0},M128A {Low: 0, High: 0},
+                               M128A {Low: 0, High: 0},M128A {Low: 0, High: 0},
+                               M128A {Low: 0, High: 0},M128A {Low: 0, High: 0},
+                               M128A {Low: 0, High: 0},M128A {Low: 0, High: 0},
+                               M128A {Low: 0, High: 0},M128A {Low: 0, High: 0},
+                               M128A {Low: 0, High: 0},M128A {Low: 0, High: 0},
+                               M128A {Low: 0, High: 0},M128A {Low: 0, High: 0},
+                               M128A {Low: 0, High: 0},M128A {Low: 0, High: 0}],
+                Reserved4: [0u8; 96],
+            },
+            VectorRegister: [M128A {Low: 0, High: 0},M128A {Low: 0, High: 0},
+                             M128A {Low: 0, High: 0},M128A {Low: 0, High: 0},
+                             M128A {Low: 0, High: 0},M128A {Low: 0, High: 0},
+                             M128A {Low: 0, High: 0},M128A {Low: 0, High: 0},
+                             M128A {Low: 0, High: 0},M128A {Low: 0, High: 0},
+                             M128A {Low: 0, High: 0},M128A {Low: 0, High: 0},
+                             M128A {Low: 0, High: 0},M128A {Low: 0, High: 0},
+                             M128A {Low: 0, High: 0},M128A {Low: 0, High: 0},
+                             M128A {Low: 0, High: 0},M128A {Low: 0, High: 0},
+                             M128A {Low: 0, High: 0},M128A {Low: 0, High: 0},
+                             M128A {Low: 0, High: 0},M128A {Low: 0, High: 0},
+                             M128A {Low: 0, High: 0},M128A {Low: 0, High: 0},
+                             M128A {Low: 0, High: 0},M128A {Low: 0, High: 0}],
+            VectorControl: 0,
+            DebugControl: 0,
+            LastBranchToRip: 0,
+            LastBranchFromRip: 0,
+            LastExceptionToRip: 0,
+            LastExceptionFromRip: 0,
+            _align: [ ALIGNMENT{0:0,1:0}; 0]
+        };
+        ctx
+    }
+}
+
+
 #[repr(C)]
 pub struct XSAVE_FORMAT {
     pub ControlWord: WORD,
@@ -155,6 +251,48 @@ pub struct WOW64_CONTEXT {
     pub Esp: DWORD,
     pub SegSs: DWORD,
     pub ExtendedRegisters: [BYTE; MAXIMUM_SUPPORTED_EXTENSION],
+}
+
+impl WOW64_CONTEXT {
+    pub fn new() -> WOW64_CONTEXT {
+        let mut ctx = WOW64_CONTEXT {
+            ContextFlags: 0,
+            Dr0: 0,
+            Dr1: 0,
+            Dr2: 0,
+            Dr3: 0,
+            Dr6: 0,
+            Dr7: 0,
+            FloatSave: FLOATING_SAVE_AREA {
+                ControlWord: 0,
+                StatusWord: 0,
+                TagWord: 0,
+                ErrorOffset: 0,
+                ErrorSelector: 0,
+                DataOffset: 0,
+                DataSelector: 0,
+                RegisterArea: [0u8; 80],
+                Cr0NpxState: 0,
+            },
+            SegGs: 0,
+            SegFs: 0,
+            SegEs: 0,
+            SegDs: 0,
+            Edi: 0,
+            Esi: 0,
+            Ebx: 0,
+            Edx: 0,
+            Ecx: 0,
+            Eax: 0,
+            Ebp: 0,
+            Eip: 0,
+            SegCs: 0,
+            Esp: 0,
+            SegSs: 0,
+            ExtendedRegisters: [0u8; MAXIMUM_SUPPORTED_EXTENSION],
+        };
+        ctx
+    }
 }
 
 #[repr(C)]
@@ -218,7 +356,8 @@ pub struct SecurityAttributes {
     pub bInheritHandle: BOOL
 }
 
-pub struct DebugEvent {
+#[repr(C)]
+pub struct DEBUG_EVENT {
     pub dwDebugEventCode: DWORD,
     pub dwProcessId: DWORD,
     pub dwThreadId: DWORD,
@@ -264,7 +403,7 @@ extern "stdcall" {
                          lpte: LPTHREADENTRY32) -> BOOL;
     pub fn Thread32Next(hSnapshot: HANDLE,
                         lpte: LPTHREADENTRY32) -> BOOL;
-    pub fn WaitForDebugEvent(lpDebugEvent: LPVOID,
+    pub fn WaitForDebugEvent(lpDebugEvent: LPDEBUG_EVENT,
                              dwMilliseconds: DWORD) -> BOOL;
     pub fn Wow64GetThreadContext(hThread: HANDLE,
                                  lpContext: PWOW64_CONTEXT) -> BOOL;

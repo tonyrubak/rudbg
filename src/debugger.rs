@@ -119,7 +119,7 @@ pub fn debug(debugger: &mut Debugger) {
 }
 
 pub fn get_debug_event(debugger: &mut Debugger) {
-    let mut event = win32::DebugEvent {
+    let mut event = win32::DEBUG_EVENT {
         dwDebugEventCode: 0,
         dwProcessId: 0,
         dwThreadId: 0,
