@@ -186,7 +186,105 @@ pub fn get_thread_context(debugger: &Debugger, thread_id: win32::DWORD) ->
 }
 
 fn get_thread_context64(debugger: &Debugger, thread_id: win32::DWORD) -> Result<win32::CONTEXT, win32::DWORD> {
-    Err(0)
+    let mut context = win32::CONTEXT {
+        P1Home: 0,
+        P2Home: 0,
+        P3Home: 0,
+        P4Home: 0,
+        P5Home: 0,
+        P6Home: 0,
+        ContextFlags: win32::CONTEXT_DEBUG_REGISTERS | win32::CONTEXT_FULL,
+        MxCsr: 0,
+        SegCs: 0,
+        SegDs: 0,
+        SegEs: 0,
+        SegFs: 0,
+        SegGs: 0,
+        SegSs: 0,
+        EFlags: 0,
+        Dr0: 0,
+        Dr1: 0,
+        Dr2: 0,
+        Dr3: 0,
+        Dr6: 0,
+        Dr7: 0,
+        Rax: 0,
+        Rcx: 0,
+        Rdx: 0,
+        Rbx: 0,
+        Rsp: 0,
+        Rbp: 0,
+        Rsi: 0,
+        Rdi: 0,
+        R8: 0,
+        R9: 0,
+        R10: 0,
+        R11: 0,
+        R12: 0,
+        R13: 0,
+        R14: 0,
+        R15: 0,
+        Rip: 0,
+        FltSave: win32::XMM_SAVE_AREA32 {
+            ControlWord: 0,
+            StatusWord: 0,
+            TagWord: 0,
+            Reserved1: 0,
+            ErrorOpcode: 0,
+            ErrorOffset: 0,
+            ErrorSelector: 0,
+            Reserved2: 0,
+            DataOffset: 0,
+            DataSelector: 0,
+            Reserved3: 0,
+            MxCsr: 0,
+            MxCsr_Mask: 0,
+            FloatRegisters: [win32::M128A {Low: 0, High: 0},win32::M128A {Low: 0, High: 0},
+                             win32::M128A {Low: 0, High: 0},win32::M128A {Low: 0, High: 0},
+                             win32::M128A {Low: 0, High: 0},win32::M128A {Low: 0, High: 0},
+                             win32::M128A {Low: 0, High: 0},win32::M128A {Low: 0, High: 0}],
+            XmmRegisters: [win32::M128A {Low: 0, High: 0},win32::M128A {Low: 0, High: 0},
+                           win32::M128A {Low: 0, High: 0},win32::M128A {Low: 0, High: 0},
+                           win32::M128A {Low: 0, High: 0},win32::M128A {Low: 0, High: 0},
+                           win32::M128A {Low: 0, High: 0},win32::M128A {Low: 0, High: 0},
+                           win32::M128A {Low: 0, High: 0},win32::M128A {Low: 0, High: 0},
+                           win32::M128A {Low: 0, High: 0},win32::M128A {Low: 0, High: 0},
+                           win32::M128A {Low: 0, High: 0},win32::M128A {Low: 0, High: 0},
+                           win32::M128A {Low: 0, High: 0},win32::M128A {Low: 0, High: 0}],
+            Reserved4: [0u8; 96],
+        },
+        VectorRegister: [win32::M128A {Low: 0, High: 0},win32::M128A {Low: 0, High: 0},
+                         win32::M128A {Low: 0, High: 0},win32::M128A {Low: 0, High: 0},
+                         win32::M128A {Low: 0, High: 0},win32::M128A {Low: 0, High: 0},
+                         win32::M128A {Low: 0, High: 0},win32::M128A {Low: 0, High: 0},
+                         win32::M128A {Low: 0, High: 0},win32::M128A {Low: 0, High: 0},
+                         win32::M128A {Low: 0, High: 0},win32::M128A {Low: 0, High: 0},
+                         win32::M128A {Low: 0, High: 0},win32::M128A {Low: 0, High: 0},
+                         win32::M128A {Low: 0, High: 0},win32::M128A {Low: 0, High: 0},
+                         win32::M128A {Low: 0, High: 0},win32::M128A {Low: 0, High: 0},
+                         win32::M128A {Low: 0, High: 0},win32::M128A {Low: 0, High: 0},
+                         win32::M128A {Low: 0, High: 0},win32::M128A {Low: 0, High: 0},
+                         win32::M128A {Low: 0, High: 0},win32::M128A {Low: 0, High: 0},
+                         win32::M128A {Low: 0, High: 0},win32::M128A {Low: 0, High: 0}],
+        VectorControl: 0,
+        DebugControl: 0,
+        LastBranchToRip: 0,
+        LastBranchFromRip: 0,
+        LastExceptionToRip: 0,
+        LastExceptionFromRip: 0,
+        _align: [ win32::ALIGNMENT{0:0,1:0}; 0]
+    };
+    let thread = match open_thread(thread_id) {
+        Ok(t) => t,
+        Err(e) => { return Err(e); }
+    };
+    if unsafe { win32::GetThreadContext(thread, &mut context as win32::LPCONTEXT) } != 0 {
+        unsafe { win32::CloseHandle(thread) };
+        Ok(context)
+    } else {
+        let err = unsafe { win32::GetLastError() };
+        Err(err)
+    }    
 }
 
 fn get_thread_context32(debugger: &Debugger, thread_id: win32::DWORD) -> Result<win32::WOW64_CONTEXT, win32::DWORD> {

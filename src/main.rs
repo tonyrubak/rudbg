@@ -1,3 +1,4 @@
+#![feature(repr_simd)]
 extern crate either;
 extern crate kernel32;
 
@@ -32,7 +33,11 @@ fn main() {
         match debugger::get_thread_context(&debugger, thread) {
             Ok(c) => match c {
                 either::Left(c) => {
-                    ctx = c;},
+                    println!("Dumping attached process registers");
+                    println!("EIP: {}", c.Rip);
+                    println!("ESP: {}", c.Rsp);
+                    println!("EBP: {}", c.Rbp);
+                },
                 either::Right(c) => {
                     wow64ctx = c;
                     println!("Dumping attached process registers");
