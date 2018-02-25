@@ -27,10 +27,7 @@ fn main() {
     };
 
     for thread in threads {
-        let ctx: win32::CONTEXT;
-        let wow64ctx: win32::WOW64_CONTEXT;
-        
-        match debugger::get_thread_context(&debugger, thread) {
+         match debugger::get_thread_context(&debugger, thread) {
             Ok(c) => match c {
                 either::Left(c) => {
                     println!("Dumping attached process registers");
@@ -41,9 +38,9 @@ fn main() {
                 either::Right(c) => {
                     wow64ctx = c;
                     println!("Dumping attached process registers");
-                    println!("EIP: {}", wow64ctx.Eip);
-                    println!("ESP: {}", wow64ctx.Esp);
-                    println!("EBP: {}", wow64ctx.Ebp);
+                    println!("EIP: {}", c.Eip);
+                    println!("ESP: {}", c.Esp);
+                    println!("EBP: {}", c.Ebp);
                 }
             },
             Err(e) => {
