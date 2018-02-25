@@ -29,7 +29,7 @@ impl Debugger {
             creation_flags: 0x0,
             pid: 0,
             process: ptr::null_mut(),
-            thread: ptr::null_mut(),
+            thread_id: 0,
             context32: win32::WOW64_CONTEXT::new(),
             context64: win32::CONTEXT::new(),
             wow64: 0,
@@ -146,20 +146,21 @@ pub fn get_debug_event(mut debugger: &mut Debugger) {
     let mut status = win32::DBG_CONTINUE;
 
     if unsafe { win32::WaitForDebugEvent(&mut event as win32::LPDEBUG_EVENT, win32::INFINITE) } != 0 {
-        debugger.thread = match open_thread(event.dwThreadId) {
+        let thread = match open_thread(event.dwThreadId) {
             Ok(t) => t,
-            Err(_) => { return; }
+            Err(_) => { panic!("Could not get handle to thread"); }
         };
+        debugger.thread_id = event.dwThreadId;
         if debugger.wow64 == 1 {
             debugger.context32 = match get_thread_context32(event.dwThreadId) {
                 Ok(ctx) => ctx,
                 Err(_) => { return; }
             };
         } else {
-            debugger.context64 = match get_thread_context64_from_id(event.dwThreadId) {
+            debugger.context64 = match get_thread_context64(thread) {
                 Ok(ctx) => ctx,
-                Err(_) => { return; }
-                };
+                Err(_) => { panic!("Could not get thread context"); }
+            };
         }
 
         if event.dwDebugEventCode == win32::EXCEPTION_DEBUG_EVENT {
@@ -181,6 +182,7 @@ pub fn get_debug_event(mut debugger: &mut Debugger) {
         println!("Event code: {evcode} Thread ID: {thread}", evcode = event.dwDebugEventCode,
                  thread = event.dwThreadId);
         let _ = unsafe { win32::ContinueDebugEvent(event.dwProcessId, event.dwThreadId, status) };
+        let _ = unsafe { win32::CloseHandle(thread) };
     }
 }
 
@@ -335,21 +337,36 @@ fn exception_handler_breakpoint(debugger: &mut Debugger) -> win32::DWORD {
         println!("Hit system breaktpoint");
     } else {
         println!("Hit user-defined breakpoint");
-        let (ptr, len) = debugger.breakpoints[&(debugger.exception_address as win32::LPCVOID)];
+        let instr = &debugger.breakpoints[&(debugger.exception_address as win32::LPCVOID)];
         let _ = write_process_memory(&debugger, debugger.exception_address,
-                             unsafe { slice::from_raw_parts(ptr, len) });
-        if debugger.wow64 == 0 {
-            debugger.context64 = match get_thread_context64(debugger.thread) {
-                Ok(ctx) => ctx,
-                Err(_) => { panic!("Error getting thread context in breakpoint."); }
-            };
-            debugger.context64.Rip -= 1;
-            let _ = unsafe { win32::SetThreadContext(debugger.thread,
-                                                     &mut debugger.context64 as win32::LPCONTEXT) };
+                             instr.as_slice());
+        
+        debugger.context64 = match get_thread_context64_from_id(debugger.thread_id) {
+            Ok(ctx) => ctx,
+            Err(e) => {
+                println!("Error code: {}", e);
+                panic!("Could not get thread context");
+            }
+        };
+        
+        debugger.context64.Rip -= 1;
+
+        let thread = match open_thread(debugger.thread_id) {
+            Ok(th) => th,
+            Err(n) => {
+                eprintln!("Error code: {}", n);
+                panic!("Couldn't get a handle to the thread");
+            }
+        };
+        
+        let res = unsafe { win32::SetThreadContext(thread,
+                                                   &mut debugger.context64 as win32::LPCONTEXT) };
+        if res == 0 {
+            let err = unsafe { win32::GetLastError() };
+            println!("Error code: {}", err);
+            panic!("Error setting thread context.");
         }
-        else {
-            panic!("Can't handle breakpoints in 32-bit images yet");
-        }
+        let _ = unsafe { win32::CloseHandle(thread) };
     }
     win32::DBG_CONTINUE
 }
