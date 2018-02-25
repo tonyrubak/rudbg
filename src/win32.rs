@@ -37,6 +37,17 @@ pub const PROCESS_ALL_ACCESS: DWORD = (0x000F0000 | 0x00100000 | 0xFFF);
 pub const TH32CS_SNAPTHREAD: DWORD = 0x00000004;
 pub const THREAD_ALL_ACCESS: DWORD = 0x001F03FF;
 
+// Debugging event codes
+pub const EXCEPTION_DEBUG_EVENT: DWORD = 0x1;
+pub const CREATE_THREAD_DEBUG_EVENT: DWORD = 0x2;
+pub const CREATE_PROCESS_DEBUG_EVENT: DWORD = 0x3;
+pub const EXIT_THREAD_DEBUG_EVENT: DWORD = 0x4;
+pub const EXIT_PROCESS_DEBUG_EVENT: DWORD = 0x5;
+pub const LOAD_DLL_DEBUG_EVENT: DWORD = 0x6;
+pub const UNLOAD_DLL_DEBUG_EVENT: DWORD = 0x7;
+pub const OUTPUT_DEBUG_STRING_EVENT: DWORD = 0x8;
+pub const RIP_EVENT: DWORD = 0x9;
+
 // This type is needed to force CONTEXT to align to 16 bytes
 #[repr(simd)]
 pub struct ALIGNMENT(pub u64, pub u64);
