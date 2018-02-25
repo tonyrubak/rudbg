@@ -158,18 +158,25 @@ pub fn get_debug_event(debugger: &mut Debugger) {
     }
 }
 
-pub fn detach(debugger: Debugger) -> bool {
-    let res = unsafe { win32::DebugActiveProcessStop(debugger.pid) };
-    if res != 0 {
-        println!("Finished debugging");
-        true
+pub fn detach(debugger: &mut Debugger) -> bool {
+    let retval: bool;
+    if debugger.attached {
+        let res = unsafe { win32::DebugActiveProcessStop(debugger.pid) };
+        if res != 0 {
+            debugger.attached = false;
+            println!("Finished debugging");
+            retval = true;
+        }
+        else {
+            let err = unsafe { win32::GetLastError() };
+            eprintln!("Something went wrong detaching!");
+            eprintln!("Error code: {}", err);
+            retval = false;
+        }
+    } else {
+        retval = false;
     }
-    else {
-        let err = unsafe { win32::GetLastError() };
-        println!("Something went wrong!");
-        println!("Error code: {}", err);
-        false
-    }
+    return retval;
 }
 
 pub fn enumerate_threads(debugger: &Debugger) -> Result<Vec<win32::DWORD>, win32::DWORD> {
@@ -205,9 +212,9 @@ pub fn enumerate_threads(debugger: &Debugger) -> Result<Vec<win32::DWORD>, win32
     }
 }
 
-pub fn get_thread_context(debugger: &Debugger, thread_id: win32::DWORD) ->
+pub fn get_thread_context(thread_id: win32::DWORD, wow64: win32::BOOL) ->
     Result<either::Either<win32::CONTEXT,win32::WOW64_CONTEXT>, win32::DWORD> {
-    if is_wow64_process(&debugger) {
+    if wow64 != 0 {
         match get_thread_context32(thread_id) {
             Ok(ctx) => Ok(either::Right(ctx)),
             Err(err) => Err(err)
