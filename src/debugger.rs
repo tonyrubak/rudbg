@@ -374,14 +374,20 @@ fn exception_handler_breakpoint(debugger: &mut Debugger) -> win32::DWORD {
 fn read_process_memory(debugger: &Debugger, address: win32::LPCVOID, length: usize)
                        -> Result<Vec<u8>,win32::DWORD> {
     let mut read = 0usize;
+    let res: win32::BOOL;
     
     let mut read_buf = Vec::<u8>::with_capacity(length);
-    
-    let res = unsafe { win32::ReadProcessMemory(debugger.process,
-                                                address,
-                                                read_buf.as_mut_ptr() as win32::LPVOID,
-                                                length,
-                                                &mut read as *mut win32::SIZE_T) };
+
+    for _ in 0..length {
+        read_buf.push(0);
+    }
+        
+    res = unsafe { win32::ReadProcessMemory(debugger.process,
+                                            address,
+                                            read_buf.as_mut_ptr() as win32::LPVOID,
+                                            length,
+                                            &mut read as *mut win32::SIZE_T) };
+
     if res == 0 {
         let err = unsafe { win32::GetLastError() };
         Err(err)
@@ -415,7 +421,7 @@ pub fn bp_set(debugger: &mut Debugger, address: win32::LPCVOID) -> win32::DWORD 
             Err(n) => { return n; }
         };
         let _ = write_process_memory(&debugger, address, b"\xCC");
-        debugger.breakpoints.insert(address, (b.as_ptr(), 1));
+        debugger.breakpoints.insert(address, b);
     }
     0
 }
