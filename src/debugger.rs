@@ -127,7 +127,24 @@ pub fn get_debug_event(debugger: &mut Debugger) {
     };
     let status = win32::DBG_CONTINUE;
 
-    if unsafe { win32::WaitForDebugEvent(&mut event as *mut _ as win32::LPVOID, win32::INFINITE) } != 0 {
+    if unsafe { win32::WaitForDebugEvent(&mut event as win32::LPDEBUG_EVENT, win32::INFINITE) } != 0 {
+        debugger.thread = match open_thread(event.dwThreadId) {
+            Ok(t) => t,
+            Err(_) => { return; }
+        };
+        if debugger.wow64 == 0 {
+            debugger.context32 = match get_thread_context32(event.dwThreadId) {
+                Ok(ctx) => ctx,
+                Err(_) => { return; }
+            };
+        } else {
+            debugger.context64 = match get_thread_context64(event.dwThreadId) {
+                Ok(ctx) => ctx,
+                Err(_) => { return; }
+                };
+        }
+        println!("Event code: {evcode} Thread ID: {thread}", evcode = event.dwDebugEventCode,
+                 thread = event.dwThreadId);
         let _ = unsafe { win32::ContinueDebugEvent(event.dwProcessId, event.dwThreadId, status) };
     }
 }
