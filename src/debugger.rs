@@ -20,7 +20,9 @@ pub struct Debugger {
     exception_code: win32::DWORD,
     exception_address: win32::PVOID,
     attached: bool,
-    breakpoints: HashMap<win32::LPCVOID, Vec::<u8>>,
+    breakpoints: HashMap<win32::LPCVOID, Vec<u8>>,
+    sys_first_breakpoint: bool,
+    hw_breakpoints: [win32::LPCVOID; 4],
 }
 
 impl Debugger {
@@ -37,6 +39,8 @@ impl Debugger {
             exception_address: ptr::null_mut(),
             attached: false,
             breakpoints: HashMap::new(),
+            sys_first_breakpoint: true,
+            hw_breakpoints: [ptr::null_mut(); 4],
             startup_info: win32::StartupInfo {
                 cb: 0,
                 lpReserved: &mut 0,
@@ -331,12 +335,24 @@ fn open_thread(thread_id: win32::DWORD) -> Result<win32::HANDLE, win32::DWORD> {
 }
 
 fn exception_handler_breakpoint(debugger: &mut Debugger) -> win32::DWORD {
+    let retval: win32::DWORD;
     println!("Handling breakpoint");
     println!("Exception address: 0x{:x}", debugger.exception_address as u32);
+    
     if !debugger.breakpoints.contains_key(&(debugger.exception_address as win32::LPCVOID)) {
-        println!("Hit system breaktpoint");
+        if debugger.sys_first_breakpoint {
+            println!("{:x}: System break exception (first chance)",
+                     debugger.exception_address as u32);
+            debugger.sys_first_breakpoint = false;
+            retval = win32::DBG_CONTINUE;
+        }
+        else {
+            println!("{:x}: Unexpected break exception. Terminating debugging.",
+                     debugger.exception_address as u32);
+            retval = win32::DBG_TERMINATE_PROCESS;
+        }
     } else {
-        println!("Hit user-defined breakpoint");
+        println!("Breakpoint hit.");
         let instr = &debugger.breakpoints[&(debugger.exception_address as win32::LPCVOID)];
         let _ = write_process_memory(&debugger, debugger.exception_address,
                              instr.as_slice());
@@ -424,6 +440,81 @@ pub fn bp_set(debugger: &mut Debugger, address: win32::LPCVOID) -> win32::DWORD 
         debugger.breakpoints.insert(address, b);
     }
     0
+}
+
+pub fn bp_set_hw(debugger: &mut Debugger, address: win32::LPCVOID,
+                 length: usize, condition: win32::DWORD) -> bool {
+    
+    let available_reg: usize;
+
+    let mut m_length = length;
+
+    if debugger.wow64 != 0 {
+        println!("Hardware breakpoints not implemented for WOW64 images.");
+        return false;
+    }
+    
+    // Check to make sure the length is legal
+    if length != 1 && length != 2 && length != 4 {
+        return false;
+    } else { m_length -= 1; }
+
+    // Check to make sure the passed condition code is legal
+    if condition != win32::HW_ACCESS && condition != win32::HW_EXECUTE && condition != win32::HW_WRITE {
+        return false;
+    }
+
+    // Get an available hardware breakpoint slot
+
+    if ptr::eq(debugger.hw_breakpoints[0], ptr::null_mut()) {
+        available_reg = 0;
+    } else if ptr::eq(debugger.hw_breakpoints[1], ptr::null_mut()) {
+        available_reg = 1;
+    } else if ptr::eq(debugger.hw_breakpoints[2], ptr::null_mut()) {
+        available_reg = 2;
+    } else if ptr::eq(debugger.hw_breakpoints[3], ptr::null_mut()) {
+        available_reg = 3;
+    } else { return false; }
+
+    // Register the hardware breakpoint in all threads
+    let threads = match enumerate_threads(&debugger) {
+        Ok(ts) => ts,
+        Err(_) => { return false; }
+    };
+
+    for thread_id in threads {
+        let mut ctx = match get_thread_context64_from_id(thread_id) {
+            Ok(c) => c,
+            Err(_) => { return false; }
+        };
+        
+        ctx.Dr7 = ctx.Dr7 | (1 << (available_reg * 2));
+        
+        match available_reg {
+            0 => ctx.Dr0 = address as u64,
+            1 => ctx.Dr1 = address as u64,
+            2 => ctx.Dr2 = address as u64,
+            3 => ctx.Dr3 = address as u64,
+            _ => { return false; }
+        };
+
+        // Set condition
+        ctx.Dr7 = ctx.Dr7 | ((condition << ((available_reg * 4) + 16)) as u64);
+
+        // Set length
+        ctx.Dr7 = ctx.Dr7 | ((m_length << ((available_reg * 4) + 18)) as u64);
+
+        // Get thread handle and set context
+        let mut thread = match open_thread(thread_id) {
+            Ok(t) => t,
+            Err(_) => { return false; }
+        };
+
+        let _ = unsafe { win32::SetThreadContext(thread, &mut ctx as win32::LPCONTEXT) };
+
+        debugger.hw_breakpoints[available_reg] = address;
+    }
+    return true;
 }
 
 pub fn resolve_function(dll_name: &str, function_name: &str) -> win32::FARPROC {
