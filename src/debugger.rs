@@ -1,6 +1,7 @@
 use win32;
 
 use either;
+use std::collections::HashMap;
 use std::mem;
 use std::ptr;
 
@@ -17,6 +18,7 @@ pub struct Debugger {
     exception_code: win32::DWORD,
     exception_address: win32::PVOID,
     attached: bool,
+    breakpoints: HashMap<win32::LPCVOID, (*const u8, usize)>,
 }
 
 impl Debugger {
@@ -32,6 +34,7 @@ impl Debugger {
             exception_code: 0,
             exception_address: ptr::null_mut(),
             attached: false,
+            breakpoints: HashMap::new(),
             startup_info: win32::StartupInfo {
                 cb: 0,
                 lpReserved: &mut 0,
@@ -315,4 +318,59 @@ fn exception_handler_breakpoint(debugger: &Debugger) -> win32::DWORD {
     println!("Handling breakpoint");
     println!("Exception address: {}", debugger.exception_address as u32);
     win32::DBG_CONTINUE
+}
+
+fn read_process_memory(debugger: &Debugger, address: win32::LPCVOID, length: usize)
+                       -> Result<Vec<u8>,win32::DWORD> {
+    let mut read = 0usize;
+    
+    let mut read_buf = Vec::<u8>::with_capacity(length);
+    
+    let res = unsafe { win32::ReadProcessMemory(debugger.process,
+                                                address,
+                                                read_buf.as_mut_ptr() as win32::LPVOID,
+                                                length,
+                                                &mut read as *mut win32::SIZE_T) };
+    if res == 0 {
+        let err = unsafe { win32::GetLastError() };
+        Err(err)
+    } else {
+        Ok(read_buf)
+    }
+}
+
+fn write_process_memory(debugger: &Debugger, address: win32::LPCVOID, data: &[u8])
+                        -> win32::DWORD {
+    let mut written = 0usize;
+    let length = data.len();
+
+    let res = unsafe { win32::WriteProcessMemory(debugger.process,
+                                                 address,
+                                                 data.as_ptr() as win32::LPCVOID,
+                                                 length,
+                                                 &mut written as *mut win32::SIZE_T) };
+
+    if res == 0 {
+        unsafe { win32::GetLastError() }
+    } else {
+        0
+    }
+}
+
+fn bp_set(debugger: &mut Debugger, address: win32::LPCVOID) -> win32::DWORD {
+    if !debugger.breakpoints.contains_key(&address) {
+        let b = match read_process_memory(&debugger, address, 1) {
+            Ok(buf) => buf,
+            Err(n) => { return n; }
+        };
+        let _ = write_process_memory(&debugger, address, b"\xCC");
+        debugger.breakpoints.insert(address, (b.as_ptr(), 1));
+    }
+    0
+}
+
+unsafe fn resolve_function(dll_name: &str, function_name: &str) -> win32::FARPROC {
+    let handle = win32::GetModuleHandle(dll_name.as_ptr());
+    let address = win32::GetProcAddress(handle, function_name.as_ptr());
+    address
 }
