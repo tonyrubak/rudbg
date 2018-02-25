@@ -13,7 +13,7 @@ pub struct Debugger {
     process_info: win32::ProcessInformation,
     pid: win32::DWORD,
     process: win32::HANDLE,
-    thread: win32::HANDLE,
+    thread_id: win32::DWORD,
     context32: win32::WOW64_CONTEXT,
     context64: win32::CONTEXT,
     wow64: win32::BOOL,
