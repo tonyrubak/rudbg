@@ -134,7 +134,7 @@ pub fn get_debug_event(debugger: &mut Debugger) {
             Ok(t) => t,
             Err(_) => { return; }
         };
-        if debugger.wow64 == 0 {
+        if debugger.wow64 == 1 {
             debugger.context32 = match get_thread_context32(event.dwThreadId) {
                 Ok(ctx) => ctx,
                 Err(_) => { return; }
