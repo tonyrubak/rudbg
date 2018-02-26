@@ -23,11 +23,15 @@ pub struct Debugger {
     breakpoints: HashMap<win32::LPCVOID, Vec<u8>>,
     sys_first_breakpoint: bool,
     hw_breakpoints: [win32::LPCVOID; 4],
+    system_info: win32::SYSTEM_INFO,
+    page_size: win32::DWORD,
+    guarded_pages: Vec<win32::PVOID>,
+    memory_breakpoints: HashMap<win32::LPCVOID, (win32::SIZE_T, win32::MEMORY_BASIC_INFORMATION)>,
 }
 
 impl Debugger {
     pub fn new() -> Debugger {
-        let dbg = Debugger {
+        let mut dbg = Debugger {
             creation_flags: 0x0,
             pid: 0,
             process: ptr::null_mut(),
@@ -41,6 +45,9 @@ impl Debugger {
             breakpoints: HashMap::new(),
             sys_first_breakpoint: true,
             hw_breakpoints: [ptr::null_mut(); 4],
+            page_size: 0,
+            guarded_pages: Vec::new(),
+            memory_breakpoints: HashMap::new(),
             startup_info: win32::StartupInfo {
                 cb: 0,
                 lpReserved: &mut 0,
@@ -67,8 +74,11 @@ impl Debugger {
                 hThread: ptr::null_mut(),
                 dwProcessId: 0,
                 dwThreadId: 0
-            }
+            },
+            system_info: win32::SYSTEM_INFO::new(),
         };
+        let _ = unsafe { win32::GetSystemInfo(&mut dbg.system_info as win32::LPSYSTEM_INFO) };
+        dbg.page_size = dbg.system_info.dwPageSize;
         dbg
     }    
 }
@@ -394,7 +404,7 @@ fn exception_handler_single_step(mut debugger: &mut Debugger) -> win32::DWORD {
     }
 
     // Get a thread context and see if this was one of our breakpoints
-    let mut ctx = match get_thread_context64_from_id(debugger.thread_id) {
+    let ctx = match get_thread_context64_from_id(debugger.thread_id) {
         Ok(ctx) => ctx,
         Err(_) => { panic!("Error getting thread context"); }
     };
@@ -547,6 +557,42 @@ pub fn bp_set_hw(debugger: &mut Debugger, address: win32::LPCVOID,
 
         let _ = unsafe { win32::CloseHandle(thread) };
     }
+    return true;
+}
+
+pub fn bp_set_mem(debugger: &mut Debugger, address: win32::LPCVOID, size: win32::SIZE_T) -> bool {
+    let mut mbi = win32::MEMORY_BASIC_INFORMATION {
+        BaseAddress: ptr::null_mut(),
+        AllocationBase: ptr::null_mut(),
+        AllocationProtect: 0,
+        RegionSize: 0,
+        State: 0,
+        Protect: 0,
+        Type: 0,
+    };
+
+    if unsafe { win32::VirtualQueryEx(debugger.process, address, &mut mbi as *mut _,
+                             mem::size_of::<win32::MEMORY_BASIC_INFORMATION>()) } <
+        mem::size_of::<win32::MEMORY_BASIC_INFORMATION>() {
+            return false;
+        }
+
+    let mut current_page = mbi.BaseAddress as usize;
+
+    while current_page <= (address as usize) + size {
+        debugger.guarded_pages.push(current_page as win32::PVOID);
+
+        let mut old_prot = 0u32;
+
+        if unsafe { win32::VirtualProtectEx(debugger.process, current_page as win32::PVOID, size,
+                                   mbi.Protect | win32::PAGE_GUARD, &mut old_prot as *mut _) } == 0 {
+            return false;
+        }
+        current_page += debugger.page_size as usize;
+    }
+
+    debugger.memory_breakpoints.insert(address,(size,mbi));
+    
     return true;
 }
 

@@ -8,6 +8,7 @@ pub type BOOL = i16;
 pub type BYTE = u8;
 pub type DWORD = u32;
 pub type DWORD64 = u64;
+pub type DWORD_PTR = ULONG_PTR;
 pub type FARPROC = *const raw::c_void;
 pub type HANDLE = *mut raw::c_void;
 pub type LONG = i32;
@@ -18,18 +19,21 @@ pub type LPCSTR = *const i8;
 pub type LPCVOID = *const raw::c_void;
 pub type LPDEBUG_EVENT = *mut DEBUG_EVENT;
 pub type LPSECURITY_ATTRIBUTES = *mut raw::c_void;
+pub type LPSYSTEM_INFO = *mut SYSTEM_INFO;
 pub type LPTHREADENTRY32 = *mut THREADENTRY32;
 pub type LPTSTR = *mut u8;
 pub type LPVOID = *mut raw::c_void;
 pub type LPCTSTR = *const u8;
 pub type PBOOL = *mut BOOL;
+pub type PDWORD = *mut DWORD;
+pub type PMEMORY_BASIC_INFORMATION = *mut MEMORY_BASIC_INFORMATION;
 pub type PVOID = *mut raw::c_void;
 pub type PWOW64_CONTEXT = *mut WOW64_CONTEXT;
 pub type SIZE_T = usize;
 pub type UCHAR = u8;
 pub type ULONG = u32;
 pub type ULONGLONG = u64;
-pub type ULONG_PTR = *mut u32;
+pub type ULONG_PTR = u64;
 pub type WORD = u16;
 pub type XMM_SAVE_AREA32 = XSAVE_FORMAT;
 
@@ -68,6 +72,19 @@ pub const EXCEPTION_SINGLE_STEP: DWORD = 0x80000004;
 pub const HW_ACCESS: DWORD = 0x00000003;
 pub const HW_EXECUTE: DWORD = 0x00000000;
 pub const HW_WRITE: DWORD = 0x00000001;
+
+// Memory page permissions
+pub const PAGE_NOACCESS: DWORD = 0x00000001;
+pub const PAGE_READONLY: DWORD = 0x00000002;
+pub const PAGE_READWRITE: DWORD = 0x00000004;
+pub const PAGE_WRITECOPY: DWORD = 0x00000008;
+pub const PAGE_EXECUTE: DWORD = 0x00000010;
+pub const PAGE_EXECUTE_READ: DWORD = 0x00000020;
+pub const PAGE_EXECUTE_READWRITE: DWORD = 0x00000040;
+pub const PAGE_EXECUTE_WRITECOPY: DWORD = 0x00000080;
+pub const PAGE_GUARD: DWORD = 0x00000100;
+pub const PAGE_NOCACHE: DWORD = 0x00000200;
+pub const PAGE_WRITECOMBINE: DWORD = 0x00000400;
 
 // This type is needed to force CONTEXT to align to 16 bytes
 #[repr(simd)]
@@ -372,7 +389,7 @@ impl EXCEPTION_RECORD {
             ExceptionRecord: ptr::null(),
             ExceptionAddress: ptr::null_mut(),
             NumberParameters: 0,
-            ExceptionInformation: [ptr::null_mut(); EXCEPTION_MAXIMUM_PARAMETERS],
+            ExceptionInformation: [0; EXCEPTION_MAXIMUM_PARAMETERS],
         }
     }
 }
@@ -427,6 +444,61 @@ pub union DEBUG_EVENT_UNION {
     pub Exception: EXCEPTION_DEBUG_INFO,
 }
 
+#[repr(C)]
+pub struct SYSTEM_INFO {
+    pub u: SYSTEM_INFO_UNION,
+    pub dwPageSize: DWORD,
+    pub lpMinimumApplicationAddress: LPVOID,
+    pub lpMaximumApplicationAddress: LPVOID,
+    pub dwActiveProcessorMask: DWORD_PTR,
+    pub dwNumberOfProcessors: DWORD,
+    pub dwProcessorType: DWORD,
+    pub dwAllocationGranularity: DWORD,
+    pub wProcessorLevel: WORD,
+    pub wProcessorRevision: WORD,
+}
+
+impl SYSTEM_INFO {
+    pub fn new() -> SYSTEM_INFO {
+        let sysinf = SYSTEM_INFO {
+            u: SYSTEM_INFO_UNION { dwOemId: 0 },
+            dwPageSize: 0,
+            lpMinimumApplicationAddress: ptr::null_mut(),
+            lpMaximumApplicationAddress: ptr::null_mut(),
+            dwActiveProcessorMask: 0,
+            dwNumberOfProcessors: 0,
+            dwProcessorType: 0,
+            dwAllocationGranularity: 0,
+            wProcessorLevel: 0,
+            wProcessorRevision: 0,
+        };
+        sysinf
+    }
+}
+
+#[repr(C)]
+pub union SYSTEM_INFO_UNION {
+    dwOemId: DWORD,
+    s: _INNER_SYSTEM_INFO,
+}
+
+#[repr(C)]
+pub struct _INNER_SYSTEM_INFO {
+    pub wProcessorArchitecture: WORD,
+    pub wReserved: WORD,
+}
+
+#[repr(C)]
+pub struct MEMORY_BASIC_INFORMATION {
+    pub BaseAddress: PVOID,
+    pub AllocationBase: PVOID,
+    pub AllocationProtect: DWORD,
+    pub RegionSize: SIZE_T,
+    pub State: DWORD,
+    pub Protect: DWORD,
+    pub Type: DWORD,
+}
+
 /* Import the functions from kernel32.dll that we need */
 #[link(name = "kernel32")]
 extern "stdcall" {
@@ -453,6 +525,7 @@ extern "stdcall" {
     pub fn GetModuleHandleA(lpModuleName: LPCSTR) -> HANDLE;
     pub fn GetProcAddress(hModule: HANDLE,
                           lpProcName: LPCSTR) -> FARPROC;
+    pub fn GetSystemInfo(lpSystemInfo: LPSYSTEM_INFO);
     pub fn GetThreadContext(hThread: HANDLE,
                             lpContext: LPCONTEXT) -> BOOL;
     pub fn IsWow64Process(hProcess: HANDLE,
@@ -474,6 +547,12 @@ extern "stdcall" {
                          lpte: LPTHREADENTRY32) -> BOOL;
     pub fn Thread32Next(hSnapshot: HANDLE,
                         lpte: LPTHREADENTRY32) -> BOOL;
+    pub fn VirtualProtectEx(hProcess: HANDLE, lpAddress: LPVOID,
+                            dwSize: SIZE_T, flNewProtect: DWORD,
+                            lpflOldProtect: PDWORD) -> BOOL;
+    pub fn VirtualQueryEx(hProcess: HANDLE, lpAddress: LPCVOID,
+                          lpBuffer: PMEMORY_BASIC_INFORMATION,
+                          dwLength: SIZE_T) -> SIZE_T;
     pub fn WaitForDebugEvent(lpDebugEvent: LPDEBUG_EVENT,
                              dwMilliseconds: DWORD) -> BOOL;
     pub fn Wow64GetThreadContext(hThread: HANDLE,
