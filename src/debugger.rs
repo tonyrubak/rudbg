@@ -179,7 +179,7 @@ pub fn get_debug_event(mut debugger: &mut Debugger) {
             } else if debugger.exception_code == win32::EXCEPTION_GUARD_PAGE {
                 println!("Guard page access detected");
             } else if debugger.exception_code == win32::EXCEPTION_SINGLE_STEP {
-                println!("Single step.");
+                status = exception_handler_single_step(&mut debugger);;
             }
         }
         
@@ -258,11 +258,11 @@ pub fn get_thread_context(thread_id: win32::DWORD, wow64: win32::BOOL) ->
         }
     }
 }
-fn get_thread_context64(hThread: win32::HANDLE) -> Result<win32::CONTEXT, win32::DWORD> {
+fn get_thread_context64(thread: win32::HANDLE) -> Result<win32::CONTEXT, win32::DWORD> {
     let mut ctx = win32::CONTEXT::new();
     ctx.ContextFlags = win32::CONTEXT_DEBUG_REGISTERS | win32::CONTEXT_FULL;
-    if unsafe { win32::GetThreadContext(hThread, &mut ctx as win32::LPCONTEXT) } != 0 {
-        unsafe { win32::CloseHandle(hThread) };
+    if unsafe { win32::GetThreadContext(thread, &mut ctx as win32::LPCONTEXT) } != 0 {
+        unsafe { win32::CloseHandle(thread) };
         Ok(ctx)
     } else {
         let err = unsafe { win32::GetLastError() };
@@ -383,7 +383,38 @@ fn exception_handler_breakpoint(debugger: &mut Debugger) -> win32::DWORD {
             panic!("Error setting thread context.");
         }
         let _ = unsafe { win32::CloseHandle(thread) };
+        retval = win32::DBG_CONTINUE;
     }
+    retval
+}
+
+fn exception_handler_single_step(mut debugger: &mut Debugger) -> win32::DWORD {
+    if debugger.wow64 != 0 {
+        panic!("Exception handling not supported for WOW64 images");
+    }
+
+    // Get a thread context and see if this was one of our breakpoints
+    let mut ctx = match get_thread_context64_from_id(debugger.thread_id) {
+        Ok(ctx) => ctx,
+        Err(_) => { panic!("Error getting thread context"); }
+    };
+
+    let slot = if ctx.Dr6 & 0x1 == 1 && !ptr::eq(debugger.hw_breakpoints[0], ptr::null_mut()) {
+        0
+    } else if ctx.Dr6 & 0x2 == 1 && !ptr::eq(debugger.hw_breakpoints[1], ptr::null_mut()) {
+        1
+    } else if ctx.Dr6 & 0x4 == 1 && !ptr::eq(debugger.hw_breakpoints[2], ptr::null_mut()) {
+        2
+    }  else if ctx.Dr6 & 0x2 == 8 && !ptr::eq(debugger.hw_breakpoints[3], ptr::null_mut()) {
+        3
+    } else { // Not my breakpoint, not my problem
+        return win32::DBG_EXCEPTION_NOT_HANDLED;
+    };
+
+    let _ = delete_hw_bp(&mut debugger, slot);
+    println!("Deleted hardware breakpoint");
+
+    // Remove hardware breakpoint
     win32::DBG_CONTINUE
 }
 
@@ -513,6 +544,8 @@ pub fn bp_set_hw(debugger: &mut Debugger, address: win32::LPCVOID,
         let _ = unsafe { win32::SetThreadContext(thread, &mut ctx as win32::LPCONTEXT) };
 
         debugger.hw_breakpoints[available_reg] = address;
+
+        let _ = unsafe { win32::CloseHandle(thread) };
     }
     return true;
 }
@@ -524,4 +557,39 @@ pub fn resolve_function(dll_name: &str, function_name: &str) -> win32::FARPROC {
         address = win32::GetProcAddress(handle, ffi::CString::new(function_name).unwrap().as_ptr());
     }
     address
+}
+
+fn delete_hw_bp(debugger: &mut Debugger, slot: usize) -> bool {
+    let threads = match enumerate_threads(&debugger) {
+        Ok(ts) => ts,
+        Err(_) => { panic!("Error getting threads");}
+    };
+    for thread_id in threads {
+        let mut ctx = match get_thread_context64_from_id(thread_id) {
+            Ok(ctx) => ctx,
+            Err(_) => { panic!("Error getting thread context"); }
+        };
+
+        ctx.Dr7 = ctx.Dr7 & !(1 << (slot * 2));
+
+        match slot {
+            0 => ctx.Dr0 = 0,
+            1 => ctx.Dr1 = 0,
+            2 => ctx.Dr2 = 0,
+            3 => ctx.Dr3 = 0,
+            _ => { return false; }
+        };
+
+        ctx.Dr7 = ctx.Dr7 & !(3 << ((slot * 4) + 16));
+        ctx.Dr7 = ctx.Dr7 & !(3 << ((slot * 4) + 18));
+
+        let thread = match open_thread(thread_id) {
+            Ok(t) => t,
+            Err(_) => { panic!("Failed to open thread"); }
+        };
+                                 
+        let _ = unsafe { win32::SetThreadContext(thread, &mut ctx as win32::LPCONTEXT) };
+    }
+    debugger.hw_breakpoints[slot] = ptr::null_mut();
+    true
 }
