@@ -20,7 +20,8 @@ fn main() {
     debugger::attach(&mut debugger, pid);
     let printf_address = debugger::resolve_function("msvcrt.dll", "printf");
     println!("Address of printf: {}", printf_address as u32);
-    debugger::bp_set_hw(&mut debugger, printf_address,1,win32::HW_EXECUTE);
+    // debugger::bp_set_hw(&mut debugger, printf_address,1,win32::HW_EXECUTE);
+    debugger::bp_set_mem(&mut debugger, printf_address,1024);
     debugger::debug(&mut debugger);
     debugger::detach(&mut debugger);
 }
